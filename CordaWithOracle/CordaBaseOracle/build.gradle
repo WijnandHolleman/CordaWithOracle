@@ -1,0 +1,209 @@
+buildscript {
+    // For sharing constants between builds
+    Properties props = new Properties()
+    file("publish.properties").withInputStream { props.load(it) }
+
+    // Our version: bump this on release.
+    ext.corda_version = "0.8-SNAPSHOT"
+    ext.gradle_plugins_version = props.getProperty("gradlePluginsVersion")
+
+    // Dependency versions. Can run 'gradle dependencyUpdates' to find new versions of things.
+    //
+    // TODO: Sort this alphabetically.
+    ext.kotlin_version = '1.0.5-2'
+    ext.quasar_version = '0.7.6'    // TODO: Upgrade to 0.7.7+ when Quasar bug 238 is resolved.
+    ext.asm_version = '0.5.3'
+    ext.artemis_version = '1.5.1'
+    ext.jackson_version = '2.8.5'
+    ext.jetty_version = '9.3.9.v20160517'
+    ext.jersey_version = '2.25'
+    ext.jolokia_version = '2.0.0-M3'
+    ext.assertj_version = '3.6.1'
+    ext.log4j_version = '2.7'
+    ext.bouncycastle_version = '1.56'
+    ext.guava_version = '19.0'
+    ext.quickcheck_version = '0.7'
+    ext.okhttp_version = '3.5.0'
+    ext.typesafe_config_version = '1.3.1'
+    ext.junit_version = '4.12'
+    ext.jopt_simple_version = '5.0.2'
+    ext.jansi_version = '1.14'
+    ext.hibernate_version = '5.2.6.Final'
+    ext.dokka_version = '0.9.13'
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        jcenter()
+        // TODO: Remove this once all packages are published to jcenter or maven central. (M6 or 7).
+        maven {
+            url  "http://r3.bintray.com/corda"
+        }
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.4'
+        classpath "net.corda.plugins:publish-utils:$gradle_plugins_version"
+        classpath "net.corda.plugins:quasar-utils:$gradle_plugins_version"
+        classpath "net.corda.plugins:cordformation:$gradle_plugins_version"
+        classpath 'com.github.ben-manes:gradle-versions-plugin:0.13.0'
+        classpath "org.jetbrains.dokka:dokka-gradle-plugin:${dokka_version}"
+    }
+}
+
+plugins {
+    // TODO The capsule plugin requires the newer DSL plugin block.It would be nice if we could unify all the plugins into one style,
+    // but the DSL has some restrictions e.g can't be used on the allprojects section. So we should revisit this if there are improvements in Gradle.
+    id "us.kirchmeier.capsule" version "1.0.2"
+}
+
+apply plugin: 'kotlin'
+apply plugin: 'project-report'
+apply plugin: 'com.github.ben-manes.versions'
+apply plugin: 'net.corda.plugins.publish-utils'
+apply plugin: 'net.corda.plugins.quasar-utils'
+apply plugin: 'net.corda.plugins.cordformation'
+apply plugin: 'org.jetbrains.dokka'
+
+// We need the following three lines even though they're inside an allprojects {} block below because otherwise
+// IntelliJ gets confused when importing the project and ends up erasing and recreating the .idea directory, along
+// with the run configurations. It also doesn't realise that the project is a Java 8 project and misconfigures
+// the resulting import. This fixes it.
+apply plugin: 'java'
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+
+allprojects {
+    apply plugin: 'java'
+    apply plugin: 'jacoco'
+
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+
+    tasks.withType(JavaCompile) {
+        options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation" << "-Xlint:-options"
+    }
+
+    group 'net.corda'
+    version "$corda_version"
+}
+
+// Check that we are running on a Java 8 JDK. The source/targetCompatibility values above aren't sufficient to
+// guarantee this because those are properties checked by the Java plugin, but we're using Kotlin.
+//
+// We recommend a specific minor version (unfortunately, not checkable directly) because JavaFX adds APIs in
+// minor releases, so we can't work with just any Java 8, it has to be a recent one.
+if (!JavaVersion.current().java8Compatible)
+    throw new GradleException("Corda requires Java 8, please upgrade to at least 1.8.0_112")
+
+repositories {
+    mavenCentral()
+    jcenter()
+    maven {
+        url 'https://dl.bintray.com/kotlin/exposed'
+    }
+}
+
+// Required for building out the fat JAR.
+dependencies {
+    compile project(':node')
+    compile "com.google.guava:guava:$guava_version"
+    runtime project(path: ":node:capsule", configuration: 'runtimeArtifacts')
+}
+
+task jacocoRootReport(type: org.gradle.testing.jacoco.tasks.JacocoReport) {
+    dependsOn = subprojects.test
+    additionalSourceDirs = files(subprojects.sourceSets.main.allSource.srcDirs)
+    sourceDirectories = files(subprojects.sourceSets.main.allSource.srcDirs)
+    classDirectories = files(subprojects.sourceSets.main.output)
+    executionData = files(subprojects.jacocoTestReport.executionData)
+    reports {
+        html.enabled = true
+        xml.enabled = true
+        csv.enabled = false
+    }
+    onlyIf = {
+        true
+    }
+    doFirst {
+        executionData = files(executionData.findAll {
+            it.exists()
+        })
+    }
+}
+
+tasks.withType(Test) {
+    reports.html.destination = file("${reporting.baseDir}/${name}")
+}
+
+task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['build']) {
+    directory "./build/nodes"
+    networkMap "Controller"
+    node {
+        name "Controller"
+        nearestCity "London"
+        advertisedServices = ["corda.notary.validating"]
+        artemisPort 10002
+        webPort 10003
+        cordapps = []
+    }
+    node {
+        name "Bank A"
+        nearestCity "London"
+        advertisedServices = []
+        artemisPort 10004
+        webPort 10005
+        cordapps = []
+    }
+    node {
+        name "Bank B"
+        nearestCity "New York"
+        advertisedServices = []
+        artemisPort 10006
+        webPort 10007
+        cordapps = []
+    }
+}
+
+bintrayConfig {
+    user = System.getenv('CORDA_BINTRAY_USER')
+    key = System.getenv('CORDA_BINTRAY_KEY')
+    repo = 'corda'
+    org = 'r3'
+    licenses = ['Apache-2.0']
+    vcsUrl = 'https://github.com/corda/corda'
+    projectUrl = 'https://github.com/corda/corda'
+    gpgSign = true
+    gpgPassphrase = System.getenv('CORDA_BINTRAY_GPG_PASSPHRASE')
+    publications = ['client', 'core', 'corda', 'finance', 'node', 'test-utils']
+    license {
+        name = 'Apache-2.0'
+        url = 'https://www.apache.org/licenses/LICENSE-2.0'
+        distribution = 'repo'
+    }
+    developer {
+        id = 'R3'
+        name = 'R3'
+        email = 'dev@corda.net'
+    }
+}
+
+// API docs
+
+dokka {
+    moduleName = 'corda'
+    outputDirectory = 'docs/build/html/api/kotlin'
+    processConfigurations = ['compile']
+    sourceDirs = files('core/src/main/kotlin', 'client/src/main/kotlin', 'node/src/main/kotlin', 'finance/src/main/kotlin')
+}
+
+task dokkaJavadoc(type: org.jetbrains.dokka.gradle.DokkaTask) {
+    moduleName = 'corda'
+    outputFormat = "javadoc"
+    outputDirectory = 'docs/build/html/api/javadoc'
+    processConfigurations = ['compile']
+    sourceDirs = files('core/src/main/kotlin', 'client/src/main/kotlin', 'node/src/main/kotlin', 'finance/src/main/kotlin')
+}
+
+task apidocs(dependsOn: ['dokka', 'dokkaJavadoc'])

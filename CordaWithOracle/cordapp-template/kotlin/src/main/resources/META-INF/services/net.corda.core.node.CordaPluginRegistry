@@ -1,0 +1,4 @@
+# Register a ServiceLoader service extending from net.corda.node.CordaPluginRegistry
+com.example.plugin.ExamplePlugin
+com.example.service.AGBOracleService$Plugin
+

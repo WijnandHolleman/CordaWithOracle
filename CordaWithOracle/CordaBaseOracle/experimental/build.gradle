@@ -1,0 +1,33 @@
+group 'com.r3cev.prototyping'
+version '1.0-SNAPSHOT'
+
+apply plugin: 'kotlin'
+
+sourceCompatibility = 1.5
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+        url 'http://oss.sonatype.org/content/repositories/snapshots'
+    }
+    jcenter()
+    maven {
+        url 'https://dl.bintray.com/kotlin/exposed'
+    }
+}
+
+compileKotlin {
+    kotlinOptions.suppressWarnings = true
+}
+compileTestKotlin {
+    kotlinOptions.suppressWarnings = true
+}
+
+dependencies {
+    compile project(':core')
+    compile project(':finance')
+
+    testCompile "junit:junit:$junit_version"
+    testCompile project(':test-utils')
+}

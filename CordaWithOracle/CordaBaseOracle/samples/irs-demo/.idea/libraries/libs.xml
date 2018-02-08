@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="libs">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../../core/build/libs/core-0.8-SNAPSHOT.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../core/build/libs/core-0.8-SNAPSHOT-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../core/build/libs/core-0.8-SNAPSHOT-sources.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

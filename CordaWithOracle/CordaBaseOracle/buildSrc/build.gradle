@@ -1,0 +1,10 @@
+apply plugin: 'maven'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Cannot use ext.guava_version here :(
+    compile "com.google.guava:guava:20.0"
+}

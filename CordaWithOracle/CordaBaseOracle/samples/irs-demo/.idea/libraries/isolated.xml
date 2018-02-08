@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="isolated">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../../core/src/main/resources/net/corda/core/node/isolated.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
